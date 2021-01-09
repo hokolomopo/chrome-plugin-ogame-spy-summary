@@ -512,13 +512,15 @@ function getPlanetHref(playerData){
 }
 
 function getLastInfoString(playerData){
-    var date = moment(playerData.date)
-    var diff = moment() - date
+    var date = playerData.date
+    var diff = moment().valueOf() - playerData.date
 
-    var secs = parseInt(diff / 10000)
+    var secs = parseInt(diff / 1000)
     var mins = parseInt(secs / 60)
     var hours = parseInt(mins / 60)
     var days = parseInt(hours / 24)
+
+    // console.log("Player", playerData.playerName, days, "days", hours, "hours", mins, "mins", sec")
 
     var str
     if(mins < 1){
@@ -527,11 +529,8 @@ function getLastInfoString(playerData){
     else if(hours < 1){
         str = mins + "m"
     }
-    else if(hours < 10){
-        str = hours + "h " + mins % 60 + "m"
-    }
     else if(days < 1){
-        str = hours + "h"
+        str = hours + "h " + mins % 60 + "m"
     }
     else{
         str = days + " days"
