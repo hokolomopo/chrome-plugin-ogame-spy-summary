@@ -31,7 +31,6 @@ var grayColor="#808080"
 var fleetSpyIconUrl = chrome.extension.getURL("images/fleet_spy.png")
 var fleetAttackIconUrl = chrome.extension.getURL("images/fleet_attack.png")
 
-var lastDetailList
 var buttonHtml = chrome.extension.getURL("button.html")
 var dialogHtml = chrome.extension.getURL("dialog.html")
 
@@ -418,23 +417,10 @@ function getSpanContent(span){
 
 
 window.addEventListener('load', function () {
-    var reports = document.getElementsByClassName("ogl-reportReady");
-
     console.log("Page loaded...")
-    
-    waitForNewReportsToLoad()
+    waitForNewReportsToLoad("spy")
   })
 
-  function setOnClickOnPaginators(){
-    var paginators = $(".paginator")
-    console.log("setOnClickOnPaginators ", +paginators.length)
-    for(i = 0;i < paginators.length;i++){
-        $(paginators[i]).click(function() {
-            console.log("ONPaginatorClick")
-            waitForNewReportsToLoad()
-            });          
-    }    
-  }
 
   var areTabClickListenersSet = false
   function setOnClickOnTabs(){
@@ -444,20 +430,22 @@ window.addEventListener('load', function () {
     var tabButtons = $("li.list_item[id=subtabs-nfFleet20]")
     $(tabButtons).click(function() {
         console.log("OnTabClick")
-        waitForNewReportsToLoad()
+        waitForNewReportsToLoad("spy")
       }); 
     var tabButtons = $("li.list_item[id=subtabs-nfFleet21]")
     $(tabButtons).click(function() {
         console.log("OnTabClick")
-        waitForNewReportsToLoad()
+        waitForNewReportsToLoad("combat")
       }); 
     areTabClickListenersSet = true
   }
 
   var retries2 = 0
-  function waitForNewReportsToLoad() {
-    if (retries2 > 20)
+  function waitForNewReportsToLoad(reportType) {
+    if (retries2 > 40){
+        retries2 = 0
         return
+    }
     retries2++
 
     setTimeout(function () {
@@ -465,18 +453,15 @@ window.addEventListener('load', function () {
         var combatReportsDetailsList = $("li.ogk-combat-win a.msg_action_link")
 
         // Next page not loaded yet
-        if((lastDetailList == null && spyReportsDetailsList.length > 0) || (spyReportsDetailsList.length > 0 && spyReportsDetailsList[0] != lastDetailList[0])){
+        if(reportType == "spy" && spyReportsDetailsList.length > 0){
             retries2 = 0
             lastDetailList = spyReportsDetailsList
-            setOnClickOnPaginators()
             setOnClickOnTabs()
             parseSpyReports()         
         }
-        else if((lastDetailList == null && combatReportsDetailsList.length > 0) || (combatReportsDetailsList.length > 0 && combatReportsDetailsList[0] != lastDetailList[0])){
-            console.log("parse vcombat ",combatReportsDetailsList[0], lastDetailList[0])
+        else if(reportType == "combat" && combatReportsDetailsList.length > 0){
             retries2 = 0
             lastDetailList = combatReportsDetailsList
-            setOnClickOnPaginators()
             setOnClickOnTabs()
             parseCombatReports()     
         }
@@ -500,23 +485,38 @@ function parseSpyReports(){
             playersData = {}
 
         // Loop on all the reports details windows
-        var detailsList = $.find("a[data-overlay-title='Plus de détails']")
-        console.log("Numbers of details found :" + detailsList.length)
-        var numberOfCalls = 0
-        for(k = 0;k < detailsList.length;k++){
-            var url = detailsList[k].href
+        var parseReportsRecursive = function(url){
+            
             //console.log("HTTP get " + k + "/" + detailsList.length + " on url " + url)
             $.get( url, function( data ) {
                 html = $.parseHTML(data)
     
                 var playerData = {}
+
+                var parseNextMessage = function(timeOfCurrentMessage){
+                    var nextMsgId = $(data).find("li.p_li a.msg_action_link")[3]
+                    nextMsgId = $(nextMsgId).attr("data-messageid")
+                    var nextMsgUrl = "https://s176-fr.ogame.gameforge.com/game/index.php?page=messages&messageId="+ nextMsgId + "&tabid=20&ajax=1"
+    
+
+                    if(playersData["lastScanDate"] != null && timeOfCurrentMessage != null && playersData["lastScanDate"] > timeOfCurrentMessage){
+                        console.log("Stopped recursion because message is older than last scan date")
+                        playersData["lastScanDate"] = moment().valueOf()
+                        savePlayersDataInCache(playersData)
+                    }
+                    else if(nextMsgUrl != url)
+                        parseReportsRecursive(nextMsgUrl)
+                    else{
+                        playersData["lastScanDate"] = moment().valueOf()
+                        savePlayersDataInCache(playersData)
+                    }
+                }
+
         
                 // Get the spied planet. Can be undefined if the planet has been deleted
                 var planetText = $(data).find("span.msg_title a")[0]
                 if(planetText == undefined){
-                    numberOfCalls++
-                    if(numberOfCalls == detailsList.length)
-                        savePlayersDataInCache(playersData)
+                    parseNextMessage()
                     return
                 }
                 planetText = planetText.innerText
@@ -529,11 +529,10 @@ function parseSpyReports(){
                 var playerName = $(data).find("div.detail_txt span span")
                 // Sometimes ogames does what the fuck
                 if(playerName[0] == undefined){
-                    numberOfCalls++
-                    if(numberOfCalls == detailsList.length)
-                        savePlayersDataInCache(playersData)
+                    parseNextMessage()
                     return
                 }
+
                 playerName = playerName[0].innerText.trim()
                 playerData.playerName = playerName
 
@@ -648,21 +647,21 @@ function parseSpyReports(){
                     playersData[planet] = playerData
                 }
 
-                console.log("Parsed spy report " + numberOfCalls + "/" + detailsList.length + " of player " + playerName)
+                console.log("Parsed spy report of player " + playerName)
+
+                savePlayersDataInCache(playersData)
+                parseNextMessage(date)
 
                 // Save data in cache for the last spy report
 
-                numberOfCalls++
-                if(numberOfCalls == detailsList.length)
-                    savePlayersDataInCache(playersData)
 
               });    
         }
-        
 
+        var detailsList = $.find("a[data-overlay-title='Plus de détails']")
+        var url = detailsList[0].href
+        parseReportsRecursive(url)
     });
-
-
 }
 
 function parseCombatReports(){
@@ -675,13 +674,35 @@ function parseCombatReports(){
         if(playersData == undefined)
             playersData = {}
 
-        var detailsList = $("li.ogk-combat-win a.msg_action_link")
-        var numberOfCalls = 0
-        for(const d of detailsList){
-            var url = $(d).attr("href")
+        var parseReportsRecursive = function(url){
             $.get( url, function( data ) {
 
-                var planet = $(data).find("span.msg_title span a")[0].innerText
+                var parseNextMessage = function(timeOfCurrentMessage){
+                    var nextMsgId = $(data).find("li.p_li a.msg_action_link")[3]
+                    nextMsgId = $(nextMsgId).attr("data-messageid")
+                    var nextMsgUrl = "https://s176-fr.ogame.gameforge.com/game/index.php?page=messages&messageId="+ nextMsgId + "&tabid=21&ajax=1"
+    
+
+                    if(playersData["lastCombatScanDate"] != null && timeOfCurrentMessage != null && playersData["lastCombatScanDate"] > timeOfCurrentMessage){
+                        console.log("Stopped recursion because message is older than last scan date")
+                        playersData["lastCombatScanDate"] = moment().valueOf()
+                        savePlayersDataInCache(playersData)
+                    }
+                    else if(nextMsgUrl != url)
+                        parseReportsRecursive(nextMsgUrl)
+                    else{
+                        playersData["lastCombatScanDate"] = moment().valueOf()
+                        savePlayersDataInCache(playersData)
+                    }
+                }
+
+                var planet = $(data).find("span.msg_title span a")[0]
+                if(planet == undefined){
+                    parseNextMessage()
+                    return
+                }
+                planet = planet.innerText
+
 
                 var date = $(data).find("span.msg_date")[0].innerText
                 date = moment(date, "DD-MM-YYYY hh:mm:ss");
@@ -710,19 +731,22 @@ function parseCombatReports(){
                     //console.log("More recent data found ", Date(date), Date(playersData[planet].date))
                 }
 
-                console.log("Parsed combat report " + numberOfCalls + "/" + detailsList.length + " of planet " + planet)
+                console.log("Parsed combat report of planet " + planet)
 
-                numberOfCalls++
-                if(numberOfCalls == detailsList.length)
-                    savePlayersDataInCache(playersData)
+                savePlayersDataInCache(playersData)
+                parseNextMessage(date)
 
             });
         }
+
+        var detailsList = $("li.ogk-combat-win a.msg_action_link")
+        var url = detailsList[0].href
+        parseReportsRecursive(url)
+
     });
 }
 
 function savePlayersDataInCache(playersData){
-    console.log(playersData)
     chrome.storage.local.set({"playersData": playersData}, function() {
         console.log("Saved data")
     });                      
