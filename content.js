@@ -117,7 +117,7 @@ function generateTable(){
         for (const [key, pData] of Object.entries(playersData)) {
             var tableLine = "<tr class='mytr'>"
             
-            tableLine +="<td class='mytd'>" + getColoredText(pData.playerName + " " + status, getPlayerDisplayColor(pData)) + "</td>"
+            tableLine +="<td class='mytd limitedColumn'>" + getColoredText(pData.playerName + " " + status, getPlayerDisplayColor(pData)) + "</td>"
             tableLine +="<td class='mytd'>" + getPlanetHref(pData) + "</td>"
             tableLine +="<td class='mytd'>" + getColoredText(pData.planetName, getPlayerDisplayColor(pData)) + "</td>"
 
@@ -427,13 +427,31 @@ window.addEventListener('load', function () {
 
   function setOnClickOnPaginators(){
     var paginators = $(".paginator")
-    console.log("setOnClickOnPaginators")
+    console.log("setOnClickOnPaginators ", +paginators.length)
     for(i = 0;i < paginators.length;i++){
         $(paginators[i]).click(function() {
             console.log("ONPaginatorClick")
             waitForNewReportsToLoad()
-          });          
+            });          
+    }    
+  }
+
+  var areTabClickListenersSet = false
+  function setOnClickOnTabs(){
+    if(areTabClickListenersSet){
+        return
     }
+    var tabButtons = $("li.list_item[id=subtabs-nfFleet20]")
+    $(tabButtons).click(function() {
+        console.log("OnTabClick")
+        waitForNewReportsToLoad()
+      }); 
+    var tabButtons = $("li.list_item[id=subtabs-nfFleet21]")
+    $(tabButtons).click(function() {
+        console.log("OnTabClick")
+        waitForNewReportsToLoad()
+      }); 
+    areTabClickListenersSet = true
   }
 
   var retries2 = 0
@@ -444,12 +462,23 @@ window.addEventListener('load', function () {
 
     setTimeout(function () {
         var spyReportsDetailsList =  $("li.ogl-reportReady a.msg_action_link")
+        var combatReportsDetailsList = $("li.ogk-combat-win a.msg_action_link")
 
         // Next page not loaded yet
         if((lastDetailList == null && spyReportsDetailsList.length > 0) || (spyReportsDetailsList.length > 0 && spyReportsDetailsList[0] != lastDetailList[0])){
             retries2 = 0
+            lastDetailList = spyReportsDetailsList
             setOnClickOnPaginators()
-            parseSpyReports()     
+            setOnClickOnTabs()
+            parseSpyReports()         
+        }
+        else if((lastDetailList == null && combatReportsDetailsList.length > 0) || (combatReportsDetailsList.length > 0 && combatReportsDetailsList[0] != lastDetailList[0])){
+            console.log("parse vcombat ",combatReportsDetailsList[0], lastDetailList[0])
+            retries2 = 0
+            lastDetailList = combatReportsDetailsList
+            setOnClickOnPaginators()
+            setOnClickOnTabs()
+            parseCombatReports()     
         }
         else{
             console.log("Page not loaded yet")
@@ -472,7 +501,6 @@ function parseSpyReports(){
 
         // Loop on all the reports details windows
         var detailsList = $.find("a[data-overlay-title='Plus de détails']")
-        lastDetailList = detailsList
         console.log("Numbers of details found :" + detailsList.length)
         var numberOfCalls = 0
         for(k = 0;k < detailsList.length;k++){
@@ -498,7 +526,15 @@ function parseSpyReports(){
                 playerData.planetName = planetName
 
                 // Get the player's name
-                var playerName = $(data).find("div.detail_txt span span")[0].innerText.trim()
+                var playerName = $(data).find("div.detail_txt span span")
+                // Sometimes ogames does what the fuck
+                if(playerName[0] == undefined){
+                    numberOfCalls++
+                    if(numberOfCalls == detailsList.length)
+                        savePlayersDataInCache(playersData)
+                    return
+                }
+                playerName = playerName[0].innerText.trim()
                 playerData.playerName = playerName
 
                 
@@ -593,21 +629,21 @@ function parseSpyReports(){
                 //Check if we already have more recent information for this player. If not, save the info in local data
                 if(playersData.hasOwnProperty(planet) && date <= playersData[planet].date){
                     //console.log("The saved data is more recent for player " + playerName)
-                    if(playersData[planet].buildings == null)
-                        playersData[planet].buildings = playerData.buildings
-                    if(playersData[planet].defense == null)
-                        playersData[planet].defense = playerData.defense
-                    if(playersData[planet].fleet == null)
-                        playersData[planet].fleet = playerData.fleet
+                    // if(playersData[planet].buildings == null)
+                    //     playersData[planet].buildings = playerData.buildings
+                    // if(playersData[planet].defense == null)
+                    //     playersData[planet].defense = playerData.defense
+                    // if(playersData[planet].fleet == null)
+                    //     playersData[planet].fleet = playerData.fleet
 
                 }
                 else{
-                    if(playerData.buildings == null && playersData.hasOwnProperty(planet))
-                        playerData.buildings = playersData[playerName].buildings
-                    if(playerData.defense == null && playersData.hasOwnProperty(planet))
-                        playerData.defense = playersData[playerName].defense
-                    if(playerData.fleet == null && playersData.hasOwnProperty(planet))
-                        playerData.deffleetense = playersData[playerName].fleet
+                    // if(playerData.buildings == null && playersData.hasOwnProperty(planet))
+                    //     playerData.buildings = playersData[playerName].buildings
+                    // if(playerData.defense == null && playersData.hasOwnProperty(planet))
+                    //     playerData.defense = playersData[playerName].defense
+                    // if(playerData.fleet == null && playersData.hasOwnProperty(planet))
+                    //     playerData.deffleetense = playersData[playerName].fleet
 
                     playersData[planet] = playerData
                 }
@@ -628,6 +664,63 @@ function parseSpyReports(){
 
 
 }
+
+function parseCombatReports(){
+
+    // Get the saved data from the extension cache
+    chrome.storage.local.get(["playersData"], function(cache) {
+        console.log("Parsing combat reports...")
+
+        var playersData = cache["playersData"]
+        if(playersData == undefined)
+            playersData = {}
+
+        var detailsList = $("li.ogk-combat-win a.msg_action_link")
+        var numberOfCalls = 0
+        for(const d of detailsList){
+            var url = $(d).attr("href")
+            $.get( url, function( data ) {
+
+                var planet = $(data).find("span.msg_title span a")[0].innerText
+
+                var date = $(data).find("span.msg_date")[0].innerText
+                date = moment(date, "DD-MM-YYYY hh:mm:ss");
+                date = date.valueOf()
+
+                var butin = []
+                var butinList = $(data).find("li.resource_list_el_small")
+                for(i = 0;i < 3;i++){
+                    butin.push(parseInt(butinList[i].innerText.replace(".", "")))
+                }
+                //console.log("Butin : " , butin , " on planet", planet)
+
+                if(playersData[planet] != null && date < playersData[planet].date){
+                    var resources = []
+                    for(var b of butin){
+                        var planetInitialRes = parseInt(b / getRewardPercentByPlayerState(playersData[planet]))
+                        var resAfterAttack = planetInitialRes - b
+                        resources.push(resAfterAttack)
+                    }
+
+                    //console.log("Ressources : " , resources , " on planet", planet)
+                    playersData[planet]["resources"] = resources
+                    playersData[planet]["date"] = date
+                }
+                else if(playersData[planet] != null){
+                    //console.log("More recent data found ", Date(date), Date(playersData[planet].date))
+                }
+
+                console.log("Parsed combat report " + numberOfCalls + "/" + detailsList.length + " of planet " + planet)
+
+                numberOfCalls++
+                if(numberOfCalls == detailsList.length)
+                    savePlayersDataInCache(playersData)
+
+            });
+        }
+    });
+}
+
 function savePlayersDataInCache(playersData){
     console.log(playersData)
     chrome.storage.local.set({"playersData": playersData}, function() {
