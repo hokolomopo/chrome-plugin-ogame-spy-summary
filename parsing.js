@@ -1,31 +1,14 @@
-console.log("Parsing script doing stuff !")
+// TODO : Change hrefs https://s176-fr.ogame.... to be able to use the extension in any universe
 
 
+// Try to parse spy reports when the page loaded
 window.addEventListener('load', function () {
-    console.log("Page loaded...")
     waitForNewReportsToLoad("spy")
   })
 
-var areTabClickListenersSet = false
-function setOnClickOnTabs(){
-  if(areTabClickListenersSet){
-      return
-  }
-  console.log("setOnClickOnTabs")
 
-  var tabButtons = $("li.list_item[id=subtabs-nfFleet20]")
-  $(tabButtons).click(function() {
-      console.log("OnTabClick spy")
-      waitForNewReportsToLoad("spy")
-    }); 
-  var tabButtons = $("li.list_item[id=subtabs-nfFleet21]")
-  $(tabButtons).click(function() {
-      console.log("OnTabClick combat")
-      waitForNewReportsToLoad("combat")
-    }); 
-  areTabClickListenersSet = true
-}
-
+// Check in the page if there is spy/combats reports to parse.
+// Try multiple time because sometimes we have to wait for reports to load after the page is loaded
 var retries2 = 0
 function waitForNewReportsToLoad(reportType) {
   if (retries2 > 40){
@@ -59,26 +42,43 @@ function waitForNewReportsToLoad(reportType) {
   }, 100);
 }
 
+// Setup a click listeners to parse the reports when we switch tabs
+var areTabClickListenersSet = false
+function setOnClickOnTabs(){
+  if(areTabClickListenersSet){
+      return
+  }
 
+  var tabButtons = $("li.list_item[id=subtabs-nfFleet20]")
+  $(tabButtons).click(function() {
+      waitForNewReportsToLoad("spy")
+    }); 
+  var tabButtons = $("li.list_item[id=subtabs-nfFleet21]")
+  $(tabButtons).click(function() {
+      waitForNewReportsToLoad("combat")
+    }); 
+  areTabClickListenersSet = true
+}
+
+// Parse the spy reports
 function parseSpyReports(){
 
   // Get the saved data from the extension cache
   chrome.storage.local.get(["playersData"], function(cache) {
-      console.log("Parsing spies messages...")
 
       playersData = cache["playersData"]
       if(playersData == undefined)
           playersData = {}
 
-      // Loop on all the reports details windows
+      // Recursively go through all the reports 
       var parseReportsRecursive = function(url){
           
-          //console.log("HTTP get " + k + "/" + detailsList.length + " on url " + url)
           $.get( url, function( data ) {
             html = $.parseHTML(data)
 
             var playerData = {}
 
+            // Function to parse the next message, or stop parsing if we reach already parsed messages/ the last message
             var parseNextMessage = function(timeOfCurrentMessage){
                 var nextMsgId = $(data).find("li.p_li a.msg_action_link")[3]
                 nextMsgId = $(nextMsgId).attr("data-messageid")
@@ -118,11 +118,10 @@ function parseSpyReports(){
                 parseNextMessage()
                 return
             }
-
             playerName = playerName[0].innerText.trim()
             playerData.playerName = playerName
 
-            
+            // Get the player status
             var playerStatus = $(data).find("div.detail_txt span span")[1].innerText.trim()
             playerData.playerStatus = playerStatus
 
@@ -143,13 +142,11 @@ function parseSpyReports(){
             for(i = 0;i < resourcesSpans.length;i++){
                 resources.push(parseInt(resourcesSpans[i].innerText.replace('.', '')))
             }
-            //console.log("Metal : " + resources[0] + " Cristal : " + resources[1] + " Deut : " + resources[2])
             playerData.resources = resources
         
             
             // Get the buildings of the planet
             var buildingList = $(data).find("ul[data-type='buildings']").find("li")
-            // Building list = 1 => no building detected
             if(buildingList.length > 1 ){
                 var buildings = new Array(3).fill(0)
                 for(i = 0;i < buildingList.length;i++){
@@ -166,7 +163,6 @@ function parseSpyReports(){
             }
             else
                 var buildings = null
-            //console.log("Mine de Metal lvl : " + buildings[0] + " Cristal lvl : " + buildings[1] + " Deut lvl : " + buildings[2])
             playerData.buildings = buildings
 
             //Get the defense
@@ -211,7 +207,7 @@ function parseSpyReports(){
             apiKey = apiKey.slice(0, apiKey.indexOf("'"))
             playerData.apiKey = apiKey
 
-            // Get the activity
+            // Get the activity of the player
             var activity = $(data).find("font")
             if(activity.length == 0)
                 activity = 60
@@ -221,28 +217,15 @@ function parseSpyReports(){
         
             //Check if we already have more recent information for this player. If not, save the info in local data
             if(playersData.hasOwnProperty(planet) && date <= playersData[planet].date){
-                //console.log("The saved data is more recent for player " + playerName)
-                // if(playersData[planet].buildings == null)
-                //     playersData[planet].buildings = playerData.buildings
-                // if(playersData[planet].defense == null)
-                //     playersData[planet].defense = playerData.defense
-                // if(playersData[planet].fleet == null)
-                //     playersData[planet].fleet = playerData.fleet
 
             }
             else{
-                // if(playerData.buildings == null && playersData.hasOwnProperty(planet))
-                //     playerData.buildings = playersData[playerName].buildings
-                // if(playerData.defense == null && playersData.hasOwnProperty(planet))
-                //     playerData.defense = playersData[playerName].defense
-                // if(playerData.fleet == null && playersData.hasOwnProperty(planet))
-                //     playerData.deffleetense = playersData[playerName].fleet
-
                 playersData[planet] = playerData
             }
 
-            console.log("Parsed spy report of player " + playerName)
+            //console.log("Parsed spy report of player " + playerName)
 
+            // Save what we parsed and parse the next message
             savePlayersDataInCache(playersData)
             parseNextMessage(date)
 
@@ -255,6 +238,7 @@ function parseSpyReports(){
   });
 }
 
+// Recursively all the combat reports
 function parseCombatReports(){
 
   // Get the saved data from the extension cache
@@ -268,6 +252,7 @@ function parseCombatReports(){
       var parseReportsRecursive = function(url){
           $.get( url, function( data ) {
 
+            // Function to parse the next message, or stop parsing if we reach already parsed messages/ the last message
               var parseNextMessage = function(timeOfCurrentMessage){
                   var nextMsgId = $(data).find("li.p_li a.msg_action_link")[3]
                   nextMsgId = $(nextMsgId).attr("data-messageid")
@@ -287,6 +272,7 @@ function parseCombatReports(){
                   }
               }
 
+              // The the planet
               var planet = $(data).find("span.msg_title span a")[0]
               if(planet == undefined || playerData[planet] == null){
                   parseNextMessage()
@@ -294,18 +280,19 @@ function parseCombatReports(){
               }
               planet = planet.innerText
 
-
+              // Get the date of the report
               var date = $(data).find("span.msg_date")[0].innerText
               date = moment(date, "DD-MM-YYYY hh:mm:ss");
               date = date.valueOf()
 
+            // Get the rewards of the combat
               var butin = []
               var butinList = $(data).find("li.resource_list_el_small")
               for(i = 0;i < 3;i++){
                   butin.push(parseInt(butinList[i].innerText.replace(".", "")))
               }
 
-              //console.log("Butin : " , butin , " on planet", planet)
+              // Change the player data if this report is the most recent information about this player
               var rewardPercent = getRewardPercentByPlayerState(playersData[planet])
               if(playersData[planet] != null && date > playersData[planet].date){
                   var resources = []
@@ -314,17 +301,16 @@ function parseCombatReports(){
                       resources.push(resourcesLeft)
                   }
 
-                  //console.log("Ressources : " , resources , " on planet", planet)
                   playersData[planet]["resources"] = resources
                   playersData[planet]["date"] = date
-                  //console.log(playersData)
               }
               else if(playersData[planet] != null){
                   //console.log("More recent data found ", Date(date), Date(playersData[planet].date))
               }
 
-              console.log("Parsed combat report of planet " + planet)
+              //console.log("Parsed combat report of planet " + planet)
 
+              // Save the data and parse the next message
               savePlayersDataInCache(playersData)
               parseNextMessage(date)
 
@@ -338,12 +324,14 @@ function parseCombatReports(){
   });
 }
 
+// Save the players data in the cache
 function savePlayersDataInCache(playersData){
   chrome.storage.local.set({"playersData": playersData}, function() {
       console.log("Saved data")
   });                      
 }
 
+// Get percentage of resources gotten in the combat
 function getRewardPercentByPlayerState(playerData){
     var status = playerData.playerStatus
 
@@ -365,6 +353,7 @@ function getRewardPercentByPlayerState(playerData){
     
 }
 
+// Get the value of defenses
 function getDefenseValue(playerData){
     var defenses = playerData.defense
 
@@ -402,6 +391,7 @@ function getDefenseValue(playerData){
 
 }
 
+// Get the value of fleets
 function getFleetValue(playerData){
     var fleet = playerData.fleet
 

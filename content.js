@@ -1,7 +1,15 @@
 // TODO : Change hrefs https://s176-fr.ogame.... to be able to use the extension in any universe
 
-console.log("Ogame extenstion doing stuff !")
 
+// Font colors
+const metalColor = "#ff85a2"
+const cristalColor = "#65defc"
+const deutColor = "#65fcad"
+const defenseColor="#f27333 "
+const fleetColor="#FFFF00"
+const grayColor="#808080"
+
+// Columns of the table
 const COL_PLAYER = 0
 const COL_PLANET = 1
 const COL_PLANET_NAME = 2
@@ -15,64 +23,56 @@ const COL_CRISTAL = 9
 const COL_DEUT = 10
 const COL_TOTAL = 11
 
-var isDialogOpen = false
-
-var numberOfSpyProbes = 1
-var enableResourcesPrediction = true
+// Filter of the elemnts of the table
 var currentFilters = {}
 
-const metalColor = "#ff85a2"
-const cristalColor = "#65defc"
-const deutColor = "#65fcad"
-const defenseColor="#f27333 "
-const fleetColor="#FFFF00"
-var grayColor="#808080"
-
-
-var buttonHtml = chrome.extension.getURL("button.html")
-var dialogHtml = chrome.extension.getURL("dialog.html")
+// Settings of the plugin
+var numberOfSpyProbes = 1
+var enableResourcesPrediction = true
 
 
 // Disable scroll if dialog is open. Kinda jumpy but W/E
+var isDialogOpen = false
 window.addEventListener('scroll', function(event){
     if(isDialogOpen)
         window.scrollTo(0, 0);
     }, true)
 
 
+// Load the button that opens the dialog
+const buttonHtml = chrome.extension.getURL("button.html")
 $("div[id=planetbarcomponent]").append("<div id='myPlaceholder'/>")
 $("#myPlaceholder").load(buttonHtml, function(){
-    console.log("OnLoadComplete")
     var button = $("#inactiveFarmButton")[0]
     $(button).click(function(){
-        console.log("OnButtonClick")
         openOverlay()
     })    
 
 })
 
+// Load the dialog
+const dialogHtml = chrome.extension.getURL("dialog.html")
 $("<div id='myDialogPlaceHolder'/>").insertBefore("body")
 $("#myDialogPlaceHolder").load(dialogHtml, function(){
-    console.log("OnDialogLoadComplete")
     setFiltersClickListeners()
     setSettingsListeners()
 
+    // Close if we click beside the dialog
     var overlay = $("#InactiveFarmOverlay")
     $(overlay).click(function(){
         closeOverlay()
     })
 
+    // Stop the propagation of click if the click hit a dialog
     $(".menuContainer").click(function(event ){
         event.stopPropagation();
-        console.log("menuContainer")
     })
     $(".mytable").click(function(event ){
         event.stopPropagation();
-        console.log("mytable")
     })
 })
 
-
+// Open the dialog and the overlay
 function openOverlay(){
     var overlay = $("#InactiveFarmOverlay")
     isDialogOpen = true
@@ -82,14 +82,17 @@ function openOverlay(){
     generateTable()
 }
 
+// Hide the dialog and the overlay
 function closeOverlay(){
     var overlay = $("#InactiveFarmOverlay")
     overlay.hide()
     isDialogOpen = false
 }
 
+// Create the rows of the table
 function generateTable(){
 
+    // Get the fleet movements (what fleets are currently moving and to where)
     var fleetMissions = getCurrentFleetMovements()
 
     chrome.storage.local.get(["playersData"], function(cache) {
@@ -99,8 +102,8 @@ function generateTable(){
         if(playersData == undefined)
             playersData = {}
 
+        // Create table header and trailer
         var tableHeader = "<tbody class='mytbody'>"
-
         tableHeader += "<tr class='mytr'>"
                             + "<th id='headerPlayer' class='sortable myth'>Player</th>"
                             + "<th id='headerPlanet' class='sortable myth'>Coords</th>"
@@ -116,27 +119,35 @@ function generateTable(){
                             + "<th id='headerTotal' class='sortable myth'>Total</th>"
                             + "<th class='myth'>Actions</th>"
                         +"</tr>"
-            
+        
         var tableTrailer = "</tbody>"
 
 
+        // Generate the table rows for each element of the data
         for (const [key, pData] of Object.entries(playersData)) {
             if(pData == null || pData.planet == undefined)
                 continue
 
             var tableLine = "<tr class='mytr'>"
-                       
+            
+            // Player name
             tableLine +="<td class='mytd limitedColumn'>" + getColoredText(pData.playerName + " " + pData.playerStatus, getPlayerDisplayColor(pData)) + "</td>"
+
+            // Planet coordinates
             tableLine +="<td class='mytd'>" + getPlanetHref(pData) + "</td>"
+
+            // Planet name
             tableLine +="<td class='mytd'>" + getColoredText(pData.planetName, getPlayerDisplayColor(pData)) + "</td>"
 
-            // var options = { day: '2-digit', year: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }; date.toLocaleDateString("fr-FR", options);
+            // Time of last report
             var dateString = '<div class="myTooltip">'+ getColoredText(getLastInfoString(pData), getActivityColor(pData)) + ' <span class="myTooltiptext">' + 
                     getColoredText(getToolTip({"Activity" : getActivityString(pData)}), getActivityColor(pData)) + '</span> </div>'
             tableLine +="<td class='mytd'>" + dateString + "</td>"
 
+            // Fleets currently flying
             tableLine +="<td class='mytd' style='text-align:center' >" + getFleetIcon(pData, fleetMissions) + "</td>"
 
+            // Value of the fleets + popup with fleets content
             var fleetValue = pData.fleetValue
             var fleetString = "No Data"
             var color = fleetColor
@@ -154,7 +165,7 @@ function generateTable(){
             }
             tableLine +="<td class='mytd'>" + getColoredText(fleetString, color) + "</td>"
 
-            
+            // Value of the defenses + popup with defenses content
             var defValue = pData.defenseValue
             var defString = "No Data"
             var color = defenseColor
@@ -172,9 +183,7 @@ function generateTable(){
             }
             tableLine +="<td class='mytd'>" + getColoredText(defString, color) + "</td>"
         
-
-            var production = getMinesProduction(pData)
-            var totalProd = production[0] + production[1] + production[2]
+            // Level of the mines
             var mines = pData.buildings
             if(mines == null || mines == undefined)
                 var minesText = getColoredText("No Data", grayColor)
@@ -182,6 +191,9 @@ function generateTable(){
                 var minesText = getColoredText(mines[0], metalColor) + "/" + getColoredText(mines[1], cristalColor) + "/" + getColoredText(mines[2], deutColor)
             tableLine +="<td class='mytd'>" + minesText + "</td>"
 
+            // Production of metal
+            var production = getMinesProduction(pData)
+            var totalProd = production[0] + production[1] + production[2]
             var metal = parseInt(pData.resources[0])
             if(enableResourcesPrediction == true){
                 tableLine +="<td class='mytd'>" + getColoredText(parseNumberToString(metal + production[0]), metalColor) 
@@ -193,7 +205,7 @@ function generateTable(){
                 pData.metal = metal
             }
 
-
+            // Production of cristal
             var cristal = parseInt(pData.resources[1])
             if(enableResourcesPrediction == true){
                 tableLine +="<td class='mytd'>" + getColoredText(parseNumberToString(cristal + production[1]), cristalColor) 
@@ -205,6 +217,7 @@ function generateTable(){
                 pData.cristal = cristal
             }
 
+            // Production of deuterium
             var deut = parseInt(pData.resources[2])
             if(enableResourcesPrediction == true){
                 tableLine +="<td class='mytd'>" + getColoredText("~" + parseNumberToString(deut + production[2]), deutColor) 
@@ -216,7 +229,7 @@ function generateTable(){
                 pData.deut = deut
             }
 
-
+            // Total production
             var totalRes = metal + cristal + deut
             if(enableResourcesPrediction == true){
                 tableLine +="<td class='mytd'>" + parseNumberToString(totalRes + totalProd) 
@@ -228,6 +241,7 @@ function generateTable(){
                 pData.totalRes = totalRes
             }
 
+            // Action buttons
             tableLine += "<td class='mytd' style='padding-right:30px'>" 
                 + getSpyButton(pData) + " "
                 + getAttackButton(pData) + " " 
@@ -241,33 +255,33 @@ function generateTable(){
         }
 
 
-
+        // Display the table
         displayTable(tableHeader, tableTrailer, null, null, playersData)
 
     });
 }
 
+// Store last arguments of displayTable()
 var currentSortOrder = "desc"
 var currentSortBy = COL_TOTAL
 var currentTableHeader
 var currentTableTrailer
 var currentPlayersData
 
+// Create the HTML code of the table and inject it in the page
 // If the arguments are null we will use the last used values
 // If we give a sortBy but no sortOrder, we will swap the order (desc <-> asc)
 function displayTable(tableHeader, tableTrailer, sortBy, sortOrder, playersData){
     var table = $("#myTable")
     table = $(table)
 
+    // Take last argument if none were given
     if(tableHeader == null)
         tableHeader = currentTableHeader
     if(tableTrailer == null)
         tableTrailer = currentTableTrailer
     if(playersData == null)
         playersData = currentPlayersData
-
-
-    console.log("DisplayTable : sortBy " + sortBy +" sortOrder ")
 
     if(sortOrder == null && sortBy == null){
         sortOrder = currentSortOrder
@@ -284,25 +298,25 @@ function displayTable(tableHeader, tableTrailer, sortBy, sortOrder, playersData)
 
     var tableContent = tableHeader
 
-    console.log("Display table, sortBy ", sortBy, " sortOrder", sortOrder)
 
+    // Sort the table rows
     var comparator = (a, b) => compare(playersData[a], playersData[b], null, null, sortBy, sortOrder)
     var sortedKeys = Object.keys(playersData)
     sortedKeys = sortedKeys.sort(comparator)
 
+    // Apply the filter to the rows and  add the rows to the table
     for(var key of sortedKeys){
-        // console.log(filters)
-        // console.log(playersData[key])
-        // console.log(isInFilters(playersData[key], filters))
-
         if(playersData[key].tableLine != undefined && isInFilters(playersData[key], currentFilters))
             tableContent += playersData[key].tableLine
     }
 
     tableContent += tableTrailer
 
+    // Inject the created HTML in the table
     table.html(tableContent )
 
+
+    // Add clicks listsners to column headers to re-sort the table
     $("#headerPlayer").click(function(){
         displayTable(tableHeader, tableTrailer, COL_PLAYER, null, playersData)
     })
@@ -334,6 +348,7 @@ function displayTable(tableHeader, tableTrailer, sortBy, sortOrder, playersData)
         displayTable(tableHeader, tableTrailer, COL_FLEET, null, playersData)
     })
 
+    // Save parameters used for the next time
     currentSortBy = sortBy
     currentSortOrder = sortOrder
     currentTableHeader = tableHeader
@@ -377,6 +392,7 @@ function displayTable(tableHeader, tableTrailer, sortBy, sortOrder, playersData)
     }
 }
 
+// Comparator to sort the data
 function compare(pData1, pData2, item1, item2, compareOn, dir){
     if(pData1.planet == null || pData2.planet == null)
         return 0
@@ -461,13 +477,7 @@ function compare(pData1, pData2, item1, item2, compareOn, dir){
     return 0
 }
 
-function getSpanContent(span){
-    if(span.startsWith("<span"))
-        span = span.slice(span.indexOf(">") + 1)
-    return span
-
-}
-
+// COmpute the production of the mines based on the elapsed time since the report and the level of the mines
 function getMinesProduction(playerData){
     if(playerData.buildings == null)
         return [0, 0, 0]
@@ -482,9 +492,6 @@ function getMinesProduction(playerData){
     var prodMetalHeure = 30 * lvlMineMetal * 1.1**lvlMineMetal
     var prodMetal = prodMetalHeure  * (timeDiff / 3600)* multiplicator
 
-    // console.log("ProdMetal : " + parseInt(prodMetal) + " classe : " + playerData.class + " lvlMineMetal: " + lvlMineMetal + " prodMetalHeure: " +
-    //              parseInt(prodMetalHeure) + " timeDiff " + timeDiff + " (Player " + playerData.playerName +")")
-
     var lvlMineCristal = parseInt(playerData.buildings[1])
     var prodCristalHeure = 20 * lvlMineCristal * 1.1**lvlMineCristal
     var prodCristal = (prodCristalHeure / 3600) * timeDiff * multiplicator
@@ -496,6 +503,7 @@ function getMinesProduction(playerData){
     return [parseInt(prodMetal), parseInt(prodCristal), parseInt(prodDeut)]
 }
 
+// Get the color of the name of the player based on their status
 function getPlayerDisplayColor(playerData){
     var status = playerData.playerStatus
 
@@ -516,7 +524,7 @@ function getPlayerDisplayColor(playerData){
     return color
 }
 
-
+// Create list of elements from an object
 function getToolTip(object){
     var str = ""
     for(const [key, data] of Object.entries(object)){
@@ -525,10 +533,12 @@ function getToolTip(object){
     return str
 }
 
+// Wrap the text in a span with a color
 function getColoredText(text, color){
     return "<span style='color:" + color + "'>" + text + "</span>"
 }
 
+// Get a planet coordinates with a link to the page of the planet in the Galaxy
 function getPlanetHref(playerData){
     var parsedPlanet = parsePlanet(playerData.planet)
     var url = "https://s176-fr.ogame.gameforge.com/game/index.php?page=ingame&component=galaxy" +
@@ -539,6 +549,7 @@ function getPlanetHref(playerData){
     return "<a href='" + url + "' class='planetHref'> <span>" + playerData.planet + "</span> </a>" 
 }
 
+// Get a string that tells how long ago was the last report was
 function getLastInfoString(playerData){
     var date = playerData.date
     var diff = moment().valueOf() - playerData.date
@@ -547,8 +558,6 @@ function getLastInfoString(playerData){
     var mins = parseInt(secs / 60)
     var hours = parseInt(mins / 60)
     var days = parseInt(hours / 24)
-
-    // console.log("Player", playerData.playerName, days, "days", hours, "hours", mins, "mins", sec")
 
     var str
     if(mins < 1){
@@ -565,9 +574,9 @@ function getLastInfoString(playerData){
     }
 
     return str + " ago"
-
 }
 
+// Get a of the activity of the player
 function getActivityString(playerData){
     var activity = parseInt(playerData.activity)
     var color, str
@@ -587,6 +596,7 @@ function getActivityString(playerData){
 }
 
 
+// Get a color based of the activity of the player
 function getActivityColor(playerData){
     var activity = parseInt(playerData.activity)
     var color
@@ -602,15 +612,16 @@ function getActivityColor(playerData){
     return color
 }
 
-var a = 0
+// Get the action button to send spy probes
 function getSpyButton(playerData){
     var logoIcon = chrome.extension.getURL("images/spy_icon.png")
     var coords = parsePlanet(playerData.planet)
-    var onclick = "onmousedown='sendShipsWithPopup(6," + coords[0] + "," + coords[1] + "," + coords[2] + ",1," + numberOfSpyProbes +"); console.log(\"getSpyButton" +a++ + "\");'";
+    var onclick = "onmousedown='sendShipsWithPopup(6," + coords[0] + "," + coords[1] + "," + coords[2] + ",1," + numberOfSpyProbes +")'";
 
     return '<input type="image" src="'+ logoIcon + '" ' + onclick + ' class="myActionButton"/>'
 }
 
+// Get the action button to send an attack
 function getAttackButton(playerData){
     var coords = parsePlanet(playerData.planet)
     var attackUrl = "https://s176-fr.ogame.gameforge.com/game/index.php?page=ingame&component=fleetdispatch" + 
@@ -627,6 +638,7 @@ function getAttackButton(playerData){
             '</span>'
 }
 
+// Get the action button to open a combat simulator
 function getTrashSimButton(playerData){
     var logoIcon = chrome.extension.getURL("images/trashim_icon.png")
     var url = "https://trashsim.universeview.be/fr?SR_KEY=" + playerData.apiKey;
@@ -638,6 +650,7 @@ function getTrashSimButton(playerData){
             '</span>'
 }
 
+// Get the action button to delete data
 function getDeleteButton(playerData){
     var logoIcon = chrome.extension.getURL("images/trash_icon.png")
 
@@ -645,14 +658,14 @@ function getDeleteButton(playerData){
     return button
 }
 
-
+// Return an array of coordinates from a planet string ("[3:50:6]" => [3, 50, 6])
 function parsePlanet(planetString){
     planetString = planetString.slice(1, planetString.length - 1)
     var coords = planetString.split(":")
     return coords
 }
 
-
+// Parse the web page fot the current fleet movements
 function getCurrentFleetMovements(){
     var trs = $("#eventContent tr")
     missions = {}
@@ -686,6 +699,7 @@ function getCurrentFleetMovements(){
 
 }
 
+// Get an icon based on your fleet movements to this planet
 function getFleetIcon(playerData, fleetMissions){
     var planet = playerData.planet
 
@@ -721,6 +735,7 @@ function getFleetIcon(playerData, fleetMissions){
     return toReturn
 }
 
+// Parse a number to a String with K/M (5100 -> 5.1K)
 function parseNumberToString(number){
     number = parseFloat(number)
     if(number < 1000){
@@ -754,8 +769,10 @@ function parseFloatWithAbreviations(floatStr){
     return float
 }
 
-
+// Set click listeners on filters button and load the filters from the cache
 function setFiltersClickListeners(){
+
+    // Get the buttons from the page
     var playerStatusFilter = $("#playerStatusFilter")
     var maxDef = $("#maxDef")
     var maxFleet = $("#maxFleet")
@@ -763,9 +780,9 @@ function setFiltersClickListeners(){
     var playerNameSearch = $("#playerNameSearch")
     var galaxyNumberFilter = $("#galaxyNumberFilter")
     var planetNameSearch = $("#planetNameSearch")
-
     var clearFilterbutton = $("#clearFilterbutton")
 
+    // Function to get the filters values and re-render the table with the new filters
     var submitFitlersFnct = function(updateTable = true){
         var filters = {}
         filters.galaxyNumber = parseInt(galaxyNumberFilter.val())
@@ -819,7 +836,7 @@ function setFiltersClickListeners(){
 
     }
 
-    
+    // Update the table when a filter is modified
     playerStatusFilter.change(submitFitlersFnct);
     dateOfReportFilter.change(submitFitlersFnct);
     planetNameSearch.on('input', submitFitlersFnct);
@@ -844,6 +861,7 @@ function setFiltersClickListeners(){
         });                          
     }
 
+    // Setup button that clear the filters
     clearFilterbutton.click(function(){
         galaxyNumberFilter.val("")
         playerStatusFilter.val("");
@@ -875,6 +893,7 @@ function setFiltersClickListeners(){
     });
 }
 
+// Return true is the data is in the filters
 function isInFilters(playerData, filters){
     if(filters == null)
         return true
@@ -918,10 +937,14 @@ function isInFilters(playerData, filters){
     return true
 }
 
+// Set click listeners on filters button and load the filters from the cache
 function setSettingsListeners(){
+
+    // Get the buttons from the page
     var numberOfProbesOption = $("#numberOfProbesOption")
     var enableResourcesPredictionOption = $("#resourcesPredictionOption")
 
+    // Function to get the filters values and re-render the table with the new filters
     var applySettings = function(){
         console.log("Apply options")
         numberOfSpyProbes = parseInt(numberOfProbesOption.val())
@@ -937,9 +960,11 @@ function setSettingsListeners(){
         });                          
     }
 
+    // Update the table when a filter is modified
     numberOfProbesOption.on('input', applySettings);
     enableResourcesPredictionOption.change(applySettings);
 
+    // Load the data from cache
     chrome.storage.local.get(["settings"], function(cache) {
         var settings = cache["settings"]
         if(settings == null)
