@@ -721,7 +721,6 @@ function setFiltersClickListeners(){
     var playerNameSearch = $("#playerNameSearch")
     var galaxyNumberFilter = $("#galaxyNumberFilter")
 
-    var applyFilterbutton = $("#applyFilterbutton")
     var clearFilterbutton = $("#clearFilterbutton")
 
     var submitFitlersFnct = function(updateTable = true){
@@ -784,10 +783,6 @@ function setFiltersClickListeners(){
     maxDef.on('input', submitFitlersFnct);
     galaxyNumberFilter.on('input', submitFitlersFnct);
 
-    applyFilterbutton.click(function(){
-        submitFitlersFnct()
-    })
-
     // Function to save filters in cache
     var saveFiltersFunction = function() {
         var saveData = {}
@@ -809,6 +804,7 @@ function setFiltersClickListeners(){
         maxFleet.val("")
         dateOfReportFilter.val("noFilter")
         playerNameSearch.val("")
+        galaxyNumberFilter.val("")
 
         currentFilters = {}
         displayTable(null, null, null, null, null)
@@ -880,7 +876,7 @@ function setSettingsListeners(){
 
         var settings = {}
         settings.numberOfSpyProbes = numberOfSpyProbes
-        settings.enableResourcesPrediction = enableResourcesPrediction
+        settings.enableResourcesPrediction = enableResourcesPredictionOption.val()
 
         chrome.storage.local.set({"settings": settings}, function() {
             console.log("Saved Settings")
@@ -898,7 +894,7 @@ function setSettingsListeners(){
         numberOfSpyProbes = parseInt(settings.numberOfSpyProbes)
         numberOfProbesOption.val(numberOfSpyProbes)
 
-        enableResourcesPrediction = parseInt(settings.enableResourcesPrediction)
-        enableResourcesPredictionOption.val(enableResourcesPrediction == true ? "yes" : "no")
+        enableResourcesPrediction = settings.enableResourcesPrediction == "yes" ? true : false
+        enableResourcesPredictionOption.val(settings.enableResourcesPrediction)
     });
 }
