@@ -36,7 +36,7 @@
 
 .extensionTableDiv{
   float: left;
-  width: 85%;
+  width: 10%;
   height: 100%;
 }
 
@@ -154,7 +154,7 @@
 }
 
 .mytr{
-  width: 60vh;
+  /* width: 60vh; */
   margin-right: 30px;
 }
 
@@ -171,10 +171,22 @@
     max-height: 80vh;
     display: block; 
     overflow-y: auto;
+
 }
 
 .myTooltip {
   position: relative;
+  display: inline-block;
+}
+
+.myTooltip:hover {
+  display: inline-block;
+}
+
+
+
+.myTooltiptext {
+  position: absolute;
   display: inline-block;
 }
 
@@ -206,6 +218,7 @@
 }
 
 .myTooltip:hover .myTooltiptext {
+  position: absolute;
   visibility: visible;
   opacity: 1;
 }
@@ -290,6 +303,12 @@
               <input type="text" id="playerNameSearch" name="playerNameSearch" value="" placeholder="ex: Dupodrop" style="margin-top: 5px;width: 50%;">
             </div>
           </div>
+          <div class="menuElement">
+            <label for="planetNameSearch" class="myLabel">Planet Name :</label>
+            <div>
+              <input type="text" id="planetNameSearch" name="planetNameSearch" value="" placeholder="ex: Jupiter" style="margin-top: 5px;width: 50%;">
+            </div>
+          </div>
           <div class="menuElement" style="height: 20px;">
             <button id="clearFilterbutton" class="filterButton" style="">Clear Filters</button>
           </div>
@@ -318,7 +337,7 @@
       </div>
       <div class="extensionTableDiv">
       <table id="myTable" class="mytable">
-          <tbody>
+          <!-- <tbody>
               <tr>
                 <th>Player</th>
                 <th>Planet</th>
@@ -337,7 +356,7 @@
                 <td>1000 -> 2000</td>
                 <td>3000 -> 6000</td>
               </tr>
-          </tbody>
+          </tbody> -->
         </table>
       </div>
     </div>

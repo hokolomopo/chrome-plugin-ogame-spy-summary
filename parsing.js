@@ -306,10 +306,11 @@ function parseCombatReports(){
               }
 
               //console.log("Butin : " , butin , " on planet", planet)
+              var rewardPercent = getRewardPercentByPlayerState(playersData[planet])
               if(playersData[planet] != null && date > playersData[planet].date){
                   var resources = []
                   for(var b of butin){
-                      var resourcesLeft = parseInt(b * (1 - getRewardPercentByPlayerState(playersData[planet])))
+                      var resourcesLeft = parseInt((b / rewardPercent) * (1 - rewardPercent))
                       resources.push(resourcesLeft)
                   }
 
@@ -341,6 +342,27 @@ function savePlayersDataInCache(playersData){
   chrome.storage.local.set({"playersData": playersData}, function() {
       console.log("Saved data")
   });                      
+}
+
+function getRewardPercentByPlayerState(playerData){
+    var status = playerData.playerStatus
+
+    var reward = 0.5
+    if(status == "(i)"){
+        reward = 0.5
+    }
+    else if(status == "(ph)"){
+        reward = 0.75
+    }
+    else if(status == "(d)"){
+        reward = 0.5
+    }
+    else if(status == "(f)" || status == "(f ph)"){
+        reward = 0.75
+    }
+
+    return reward
+    
 }
 
 function getDefenseValue(playerData){

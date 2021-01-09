@@ -58,6 +58,20 @@ $("#myDialogPlaceHolder").load(dialogHtml, function(){
     console.log("OnDialogLoadComplete")
     setFiltersClickListeners()
     setSettingsListeners()
+
+    var overlay = $("#InactiveFarmOverlay")
+    $(overlay).click(function(){
+        closeOverlay()
+    })
+
+    $(".menuContainer").click(function(event ){
+        event.stopPropagation();
+        console.log("menuContainer")
+    })
+    $(".mytable").click(function(event ){
+        event.stopPropagation();
+        console.log("mytable")
+    })
 })
 
 
@@ -66,19 +80,14 @@ function openOverlay(){
     isDialogOpen = true
     window.scrollTo(0, 0);
     overlay.show()
-    $(overlay).click(function(){
-        overlay.hide()
-        isDialogOpen = false
-    })
-
-    var dialog = $("#InactiveFarmDialog")
-    var table = $(dialog).find("table")[0]
-    $(dialog).click(function(event ){
-        event.stopPropagation();
-        console.log("OnClickDialog")
-    })
     
     generateTable()
+}
+
+function closeOverlay(){
+    var overlay = $("#InactiveFarmOverlay")
+    overlay.hide()
+    isDialogOpen = false
 }
 
 function generateTable(){
@@ -114,7 +123,7 @@ function generateTable(){
 
 
         for (const [key, pData] of Object.entries(playersData)) {
-            if(pData.planet == undefined)
+            if(pData == null || pData.planet == undefined)
                 continue
 
             var tableLine = "<tr class='mytr'>"
@@ -328,6 +337,30 @@ function displayTable(tableHeader, tableTrailer, sortBy, sortOrder, playersData)
     currentTableHeader = tableHeader
     currentTableTrailer = tableTrailer
     currentPlayersData = playersData
+
+    // Hack for tooltips, making their position absolute on hover so that the tooltip can be displayed 
+    // outside the table (which was not possible due to the table hiding the overflow for scrolling)
+    // We cannot do that in the CSS because we need the current position when hovering over the element, or else
+    // it wouldn't work when displaying the tooltip of an element after having scrolled the table
+    var toolTips = $(".myTooltip")
+    for(let toolTip of toolTips){
+        toolTip = $(toolTip)
+        toolTip.hover(
+            function(){
+                let position = toolTip.position()
+                toolTip.css({ 
+                    position: "absolute",
+                    top : position.top, left : position.left
+                })
+            },
+            function(){
+                toolTip.css({ 
+                    position: "relative",
+                    top: 0, left:0,
+                })
+            }
+        )
+    }
 }
 
 function compare(pData1, pData2, item1, item2, compareOn, dir){
@@ -468,26 +501,6 @@ function getPlayerDisplayColor(playerData){
     return color
 }
 
-function getRewardPercentByPlayerState(playerData){
-    var status = playerData.playerStatus
-
-    var reward = 0.00000001
-    if(status == "(i)"){
-        reward = 0.5
-    }
-    else if(status == "(ph)"){
-        reward = 0.75
-    }
-    else if(status == "(d)"){
-        reward = 0.5
-    }
-    else if(status == "(f)" || status == "(f ph)"){
-        reward = 0.75
-    }
-
-    return reward
-    
-}
 
 function getToolTip(object){
     var str = ""
@@ -687,8 +700,11 @@ function parseNumberToString(number){
     if(number < 1000){
         return (number / 1000).toFixed(2) + "K"
     }
-    else if(number >= 1000){
+    else if(number >= 1000 && number < 1000000){
         return (number / 1000).toFixed(1) + "K"
+    }
+    else if(number >= 1000000){
+        return (number / 1000000).toFixed(1) + "M"
     }
 
     return number
@@ -720,15 +736,17 @@ function setFiltersClickListeners(){
     var dateOfReportFilter = $("#dateOfReportFilter")
     var playerNameSearch = $("#playerNameSearch")
     var galaxyNumberFilter = $("#galaxyNumberFilter")
+    var planetNameSearch = $("#planetNameSearch")
 
     var clearFilterbutton = $("#clearFilterbutton")
 
     var submitFitlersFnct = function(updateTable = true){
         var filters = {}
+        filters.galaxyNumber = parseInt(galaxyNumberFilter.val())
         filters.maxDef = parseFloatWithAbreviations(maxDef.val())
         filters.maxFleet = parseFloatWithAbreviations(maxFleet.val())
         filters.playerNameSearch = playerNameSearch.val()
-        filters.galaxyNumber = parseInt(galaxyNumberFilter.val())
+        filters.planetNameSearch = planetNameSearch.val()
 
         switch(playerStatusFilter.val()){
             case "":
@@ -778,6 +796,7 @@ function setFiltersClickListeners(){
     
     playerStatusFilter.change(submitFitlersFnct);
     dateOfReportFilter.change(submitFitlersFnct);
+    planetNameSearch.on('input', submitFitlersFnct);
     playerNameSearch.on('input', submitFitlersFnct);
     maxFleet.on('input', submitFitlersFnct);
     maxDef.on('input', submitFitlersFnct);
@@ -786,12 +805,13 @@ function setFiltersClickListeners(){
     // Function to save filters in cache
     var saveFiltersFunction = function() {
         var saveData = {}
+        saveData.galaxyNumberFilter = galaxyNumberFilter.val()
         saveData.dateOfReportFilter = dateOfReportFilter.val()    
         saveData.playerStatusFilter = playerStatusFilter.val()
         saveData.maxDef = maxDef.val()
         saveData.maxFleet = maxFleet.val()
         saveData.playerNameSearch = playerNameSearch.val()
-        saveData.galaxyNumberFilter = galaxyNumberFilter.val()
+        saveData.planetNameSearch = planetNameSearch.val()
 
         chrome.storage.local.set({"filters": saveData}, function() {
             console.log("Saved filters")
@@ -799,12 +819,13 @@ function setFiltersClickListeners(){
     }
 
     clearFilterbutton.click(function(){
+        galaxyNumberFilter.val("")
         playerStatusFilter.val("");
         maxDef.val("")
         maxFleet.val("")
         dateOfReportFilter.val("noFilter")
         playerNameSearch.val("")
-        galaxyNumberFilter.val("")
+        planetNameSearch.val("")
 
         currentFilters = {}
         displayTable(null, null, null, null, null)
@@ -817,12 +838,13 @@ function setFiltersClickListeners(){
         if(saveData == null)
             return
         
+        galaxyNumberFilter.val(saveData.galaxyNumberFilter)
         playerStatusFilter.val(saveData.playerStatusFilter);
         maxDef.val(saveData.maxDef)
         maxFleet.val(saveData.maxFleet)
         dateOfReportFilter.val(saveData.dateOfReportFilter)
         playerNameSearch.val(saveData.playerNameSearch)
-        galaxyNumberFilter.val(saveData.galaxyNumberFilter)
+        planetNameSearch.val(saveData.planetNameSearch)
         submitFitlersFnct(false)
     });
 }
@@ -831,6 +853,11 @@ function isInFilters(playerData, filters){
     if(filters == null)
         return true
         
+    if(filters.galaxyNumber != null && !isNaN(filters.galaxyNumber)){
+        if(parseInt(parsePlanet(playerData.planet)[0]) != parseInt(filters.galaxyNumber))
+            return false
+    }
+    
     if(filters.playerStatus != null){
         if(playerData.playerStatus != filters.playerStatus)
             return false
@@ -846,20 +873,21 @@ function isInFilters(playerData, filters){
             return false
     }
 
-    if(filters.playerNameSearch != null && filters.playerNameSearch != ""){
-        if(!playerData.playerName.toLowerCase().includes(filters.playerNameSearch.toLowerCase()))
-            return false
-    }
-
     if(filters.dateOfReport != null){
         if(parseInt(playerData.date) < parseInt(filters.dateOfReport))
             return false
     }
 
-    if(filters.galaxyNumber != null && !isNaN(filters.galaxyNumber)){
-        if(parseInt(parsePlanet(playerData.planet)[0]) != parseInt(filters.galaxyNumber))
+    if(filters.playerNameSearch != null && filters.playerNameSearch != ""){
+        if(!playerData.playerName.toLowerCase().includes(filters.playerNameSearch.toLowerCase()))
             return false
     }
+
+    if(filters.planetNameSearch != null && filters.planetNameSearch != ""){
+        if(!playerData.planetName.toLowerCase().includes(filters.planetNameSearch.toLowerCase()))
+            return false
+    }
+
 
     return true
 }
