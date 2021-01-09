@@ -41,6 +41,7 @@
     "images/attack_icon.png",
     "images/fleet_attack.png",
     "images/fleet_spy.png",
+    "images/trash_icon.png",
     "images/trashim_icon.png"],
   "manifest_version": 2
 }

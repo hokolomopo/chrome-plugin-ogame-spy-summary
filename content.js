@@ -21,15 +21,13 @@ var numberOfSpyProbes = 1
 var enableResourcesPrediction = true
 var currentFilters = {}
 
-var metalColor = "#ff85a2"
-var cristalColor = "#65defc"
-var deutColor = "#65fcad"
-var defenseColor="#f27333 "
-var fleetColor="#FFFF00"
+const metalColor = "#ff85a2"
+const cristalColor = "#65defc"
+const deutColor = "#65fcad"
+const defenseColor="#f27333 "
+const fleetColor="#FFFF00"
 var grayColor="#808080"
 
-var fleetSpyIconUrl = chrome.extension.getURL("images/fleet_spy.png")
-var fleetAttackIconUrl = chrome.extension.getURL("images/fleet_attack.png")
 
 var buttonHtml = chrome.extension.getURL("button.html")
 var dialogHtml = chrome.extension.getURL("dialog.html")
@@ -230,7 +228,11 @@ function generateTable(){
                 pData.totalRes = totalRes
             }
 
-            tableLine += "<td class='mytd' style='padding-right:30px'>" + getSpyButton(pData) + " " + getAttackButton(pData) + " " + getTrashSimButton(pData) + "</td>"
+            tableLine += "<td class='mytd' style='padding-right:30px'>" 
+                + getSpyButton(pData) + " "
+                + getAttackButton(pData) + " " 
+                + getTrashSimButton(pData) + " " 
+                + getDeleteButton(pData)  + "</td>"
 
             tableLine +="</tr>"
 
@@ -338,6 +340,18 @@ function displayTable(tableHeader, tableTrailer, sortBy, sortOrder, playersData)
     currentTableTrailer = tableTrailer
     currentPlayersData = playersData
 
+    // Set the listener fot the delete action button
+    var deleteButtons = $(".deleteDataButton")
+    for(let button of deleteButtons){
+        $(button).click(function(){
+            var planet = $(button).attr("planet")
+            delete playersData[planet]
+            displayTable(null, null, null, null, playersData)
+            chrome.storage.local.set({"playersData": playersData}, null);                      
+          
+        })
+    }
+
     // Hack for tooltips, making their position absolute on hover so that the tooltip can be displayed 
     // outside the table (which was not possible due to the table hiding the overflow for scrolling)
     // We cannot do that in the CSS because we need the current position when hovering over the element, or else
@@ -364,7 +378,8 @@ function displayTable(tableHeader, tableTrailer, sortBy, sortOrder, playersData)
 }
 
 function compare(pData1, pData2, item1, item2, compareOn, dir){
-
+    if(pData1.planet == null || pData2.planet == null)
+        return 0
 
     var compared1 = ""
     var compared2 = ""
@@ -587,10 +602,11 @@ function getActivityColor(playerData){
     return color
 }
 
+var a = 0
 function getSpyButton(playerData){
     var logoIcon = chrome.extension.getURL("images/spy_icon.png")
     var coords = parsePlanet(playerData.planet)
-    var onclick = "onclick='sendShipsWithPopup(6," + coords[0] + "," + coords[1] + "," + coords[2] + ",1," + numberOfSpyProbes +"); return false'";
+    var onclick = "onmousedown='sendShipsWithPopup(6," + coords[0] + "," + coords[1] + "," + coords[2] + ",1," + numberOfSpyProbes +"); console.log(\"getSpyButton" +a++ + "\");'";
 
     return '<input type="image" src="'+ logoIcon + '" ' + onclick + ' class="myActionButton"/>'
 }
@@ -620,6 +636,13 @@ function getTrashSimButton(playerData){
                     '<img src="' + logoIcon + '">' +
                 '</a>' +
             '</span>'
+}
+
+function getDeleteButton(playerData){
+    var logoIcon = chrome.extension.getURL("images/trash_icon.png")
+
+    var button = '<input type="image" src="'+ logoIcon + '" ' + ' class="deleteDataButton myActionButton" planet="' + playerData.planet + '"/>'
+    return button
 }
 
 
@@ -665,6 +688,9 @@ function getCurrentFleetMovements(){
 
 function getFleetIcon(playerData, fleetMissions){
     var planet = playerData.planet
+
+    var fleetSpyIconUrl = chrome.extension.getURL("images/fleet_spy.png")
+    var fleetAttackIconUrl = chrome.extension.getURL("images/fleet_attack.png")
 
     var toReturn = ""
 

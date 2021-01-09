@@ -288,7 +288,7 @@ function parseCombatReports(){
               }
 
               var planet = $(data).find("span.msg_title span a")[0]
-              if(planet == undefined){
+              if(planet == undefined || playerData[planet] == null){
                   parseNextMessage()
                   return
               }
