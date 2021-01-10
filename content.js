@@ -96,7 +96,6 @@ function generateTable(){
     var fleetMissions = getCurrentFleetMovements()
 
     chrome.storage.local.get(["playersData"], function(cache) {
-        console.log("Generating Table")
 
         playersData = cache["playersData"]
         if(playersData == undefined)
@@ -568,6 +567,9 @@ function getLastInfoString(playerData){
     }
     else if(days < 1){
         str = hours + "h " + mins % 60 + "m"
+    }
+    else if(days < 2){
+        str = days + " day"
     }
     else{
         str = days + " days"

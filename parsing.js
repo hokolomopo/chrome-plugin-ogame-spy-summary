@@ -62,6 +62,7 @@ function setOnClickOnTabs(){
 
 // Parse the spy reports
 function parseSpyReports(){
+    console.log("Parsing espionnage reports...")
 
   // Get the saved data from the extension cache
   chrome.storage.local.get(["playersData"], function(cache) {
@@ -71,29 +72,29 @@ function parseSpyReports(){
           playersData = {}
 
       // Recursively go through all the reports 
-      var parseReportsRecursive = function(url){
-          
+      var firstParsedReportId = ""
+      var parseReportsRecursive = function(msgId){
+          var url = "https://s176-fr.ogame.gameforge.com/game/index.php?page=messages&messageId="+ msgId + "&tabid=20&ajax=1"
           $.get( url, function( data ) {
             html = $.parseHTML(data)
 
             var playerData = {}
 
             // Function to parse the next message, or stop parsing if we reach already parsed messages/ the last message
-            var parseNextMessage = function(timeOfCurrentMessage){
+            var parseNextMessage = function(){
                 var nextMsgId = $(data).find("li.p_li a.msg_action_link")[3]
                 nextMsgId = $(nextMsgId).attr("data-messageid")
-                var nextMsgUrl = "https://s176-fr.ogame.gameforge.com/game/index.php?page=messages&messageId="+ nextMsgId + "&tabid=20&ajax=1"
 
 
-                if(playersData["lastScanDate"] != null && timeOfCurrentMessage != null && playersData["lastScanDate"] > timeOfCurrentMessage){
-                    console.log("Stopped recursion because message is older than last scan date")
-                    playersData["lastScanDate"] = moment().valueOf()
+                if(playersData["lastScanFirstReportId"] != null && playersData["lastScanFirstReportId"] == msgId){
+                    console.log("Stopped parsing spy reporst because current report has already been scanned before")
+                    playersData["lastScanFirstReportId"] = firstParsedReportId
                     savePlayersDataInCache(playersData)
                 }
-                else if(nextMsgUrl != url)
-                    parseReportsRecursive(nextMsgUrl)
+                else if(nextMsgId != msgId)
+                    parseReportsRecursive(nextMsgId)
                 else{
-                    playersData["lastScanDate"] = moment().valueOf()
+                    playersData["lastScanFirstReportId"] = firstParsedReportId
                     savePlayersDataInCache(playersData)
                 }
             }
@@ -223,112 +224,122 @@ function parseSpyReports(){
                 playersData[planet] = playerData
             }
 
-            //console.log("Parsed spy report of player " + playerName)
+            console.log("Parsed spy report of player " + playerName)
 
             // Save what we parsed and parse the next message
             savePlayersDataInCache(playersData)
-            parseNextMessage(date)
+            parseNextMessage()
 
             });    
       }
 
       var detailsList = $.find("a[data-overlay-title='Plus de détails']")
       var url = detailsList[0].href
-      parseReportsRecursive(url)
+      var msgId = extractMsgIdFromUrl(url)
+      firstParsedReportId = msgId
+      parseReportsRecursive(msgId)
   });
 }
 
 // Recursively all the combat reports
 function parseCombatReports(){
 
-  // Get the saved data from the extension cache
-  chrome.storage.local.get(["playersData"], function(cache) {
-      console.log("Parsing combat reports...")
+// Get the saved data from the extension cache
+chrome.storage.local.get(["playersData"], function(cache) {
+    console.log("Parsing combat reports...")
 
-      var playersData = cache["playersData"]
-      if(playersData == undefined)
-          playersData = {}  
+    var playersData = cache["playersData"]
+    if(playersData == undefined)
+        playersData = {}  
 
-      var parseReportsRecursive = function(url){
-          $.get( url, function( data ) {
+    var firstParsedReportId = ""
+    var parseReportsRecursive = function(msgId){
 
-            // Function to parse the next message, or stop parsing if we reach already parsed messages/ the last message
-              var parseNextMessage = function(timeOfCurrentMessage){
-                  var nextMsgId = $(data).find("li.p_li a.msg_action_link")[3]
-                  nextMsgId = $(nextMsgId).attr("data-messageid")
-                  var nextMsgUrl = "https://s176-fr.ogame.gameforge.com/game/index.php?page=messages&messageId="+ nextMsgId + "&tabid=21&ajax=1"
-  
+    var url = "https://s176-fr.ogame.gameforge.com/game/index.php?page=messages&messageId="+ msgId + "&tabid=21&ajax=1"
+        $.get( url, function(data) {
 
-                  if(playersData["lastCombatScanDate"] != null && timeOfCurrentMessage != null && playersData["lastCombatScanDate"] > timeOfCurrentMessage){
-                      console.log("Stopped recursion because message is older than last scan date")
-                      playersData["lastCombatScanDate"] = moment().valueOf()
-                      savePlayersDataInCache(playersData)
-                  }
-                  else if(nextMsgUrl != url)
-                      parseReportsRecursive(nextMsgUrl)
-                  else{
-                      playersData["lastCombatScanDate"] = moment().valueOf()
-                      savePlayersDataInCache(playersData)
-                  }
-              }
+        // Function to parse the next message, or stop parsing if we reach already parsed messages/ the last message
+            var parseNextMessage = function(){
+                var nextMsgId = $(data).find("li.p_li a.msg_action_link")[3]
+                nextMsgId = $(nextMsgId).attr("data-messageid")
 
-              // The the planet
-              var planet = $(data).find("span.msg_title span a")[0]
-              if(planet == undefined || playerData[planet] == null){
-                  parseNextMessage()
-                  return
-              }
-              planet = planet.innerText
+                if(playersData["lastCombatScanMsgId"] != null && playersData["lastCombatScanMsgId"] == msgId){
+                    console.log("Stopped parsing reports because current message has already been scanned before")
+                    playersData["lastCombatScanMsgId"] = firstParsedReportId
+                    savePlayersDataInCache(playersData)
+                }
+                else if(nextMsgId != msgId)
+                    parseReportsRecursive(nextMsgId)
+                else{
+                    playersData["lastCombatScanMsgId"] = firstParsedReportId
+                    savePlayersDataInCache(playersData)
+                }
+            }
 
-              // Get the date of the report
-              var date = $(data).find("span.msg_date")[0].innerText
-              date = moment(date, "DD-MM-YYYY hh:mm:ss");
-              date = date.valueOf()
+            // The the planet
+            var planet = $(data).find("span.msg_title span a")[0]
+            if(planet == undefined || playersData[planet.innerText] == null){
+                parseNextMessage()
+                return
+            }
+            planet = planet.innerText
 
-            // Get the rewards of the combat
-              var butin = []
-              var butinList = $(data).find("li.resource_list_el_small")
-              for(i = 0;i < 3;i++){
-                  butin.push(parseInt(butinList[i].innerText.replace(".", "")))
-              }
+            // Get the date of the report
+            var date = $(data).find("span.msg_date")[0].innerText
+            date = moment(date, "DD-MM-YYYY hh:mm:ss");
+            date = date.valueOf()
 
-              // Change the player data if this report is the most recent information about this player
-              var rewardPercent = getRewardPercentByPlayerState(playersData[planet])
-              if(playersData[planet] != null && date > playersData[planet].date){
-                  var resources = []
-                  for(var b of butin){
-                      var resourcesLeft = parseInt((b / rewardPercent) * (1 - rewardPercent))
-                      resources.push(resourcesLeft)
-                  }
+        // Get the rewards of the combat
+            var butin = []
+            var butinList = $(data).find("li.resource_list_el_small")
+            for(i = 0;i < 3;i++){
+                butin.push(parseInt(butinList[i].innerText.replace(".", "")))
+            }
 
-                  playersData[planet]["resources"] = resources
-                  playersData[planet]["date"] = date
-              }
-              else if(playersData[planet] != null){
-                  //console.log("More recent data found ", Date(date), Date(playersData[planet].date))
-              }
+            // Change the player data if this report is the most recent information about this player
+            var rewardPercent = getRewardPercentByPlayerState(playersData[planet])
+            if(playersData[planet] != null && date > playersData[planet].date){
+                var resources = []
+                for(var b of butin){
+                    var resourcesLeft = parseInt((b / rewardPercent) * (1 - rewardPercent))
+                    resources.push(resourcesLeft)
+                }
 
-              //console.log("Parsed combat report of planet " + planet)
+                playersData[planet]["resources"] = resources
+                playersData[planet]["date"] = date
+            }
+            else if(playersData[planet] != null){
+                //console.log("More recent data found ", Date(date), Date(playersData[planet].date))
+            }
 
-              // Save the data and parse the next message
-              savePlayersDataInCache(playersData)
-              parseNextMessage(date)
+            console.log("Parsed combat report", msgId,"of player", playersData[planet].playerName,"in planet", planet)
 
-          });
-      }
+            // Save the data and parse the next message
+            savePlayersDataInCache(playersData)
+            parseNextMessage()
 
-      var detailsList = $("li.ogk-combat-win a.msg_action_link")
-      var url = detailsList[0].href
-      parseReportsRecursive(url)
+        });
+    }
 
-  });
+    var detailsList = $("li.ogk-combat-win a.msg_action_link")
+    var url = detailsList[0].href
+    var msgId = extractMsgIdFromUrl(url)
+    firstParsedReportId = msgId
+    parseReportsRecursive(msgId)
+
+});
 }
 
 // Save the players data in the cache
 function savePlayersDataInCache(playersData){
   chrome.storage.local.set({"playersData": playersData}, function() {
-      console.log("Saved data")
   });                      
+}
+
+function extractMsgIdFromUrl(url){
+    var s = url.substring(url.indexOf("messageId=") + "messageId=".length)
+    s = s.substring(0, s.indexOf("&"))
+    return s
 }
 
 // Get percentage of resources gotten in the combat
